@@ -1,9 +1,13 @@
 import requests
 from twilio.rest import Client
+from dotenv import load_dotenv
+import os
 
-TWILIO_SID = "ACbae10f24e7efe3ce8e176be07bb3d450"
-TWILIO_AUTH_TOKEN = "61557ff372d44dd738799828392866eb"
-FROM_WHATSAPP_NUMBER = "whatsapp:+14155238886"
+load_dotenv()
+
+TWILIO_SID = os.getenv("TWILIO_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+FROM_WHATSAPP_NUMBER = os.getenv("FROM_WHATSAPP_NUMBER")
 client = Client(TWILIO_SID, TWILIO_AUTH_TOKEN)
 
 def get_latest_news(topic):
