@@ -1,9 +1,15 @@
 import requests
 
-API_KEY = "pub_86473d9e06ef50653a84b7c41161cd5ca399c"
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY")
+
 
 def get_news(topic):
-    url = f"https://newsdata.io/api/1/news?apikey={API_KEY}&q={topic}&language=en"
+    url = f"https://newsdata.io/api/1/news?apikey={NEWSDATA_API_KEY}&q={topic}&language=en"
     res = requests.get(url).json()
     if res.get("status") == "success" and res.get("results"):
         news = []
