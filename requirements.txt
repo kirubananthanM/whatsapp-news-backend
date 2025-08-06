@@ -3,3 +3,5 @@ requests
 twilio
 APScheduler
 python-dotenv
+gunicorn
+requests
