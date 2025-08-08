@@ -2,7 +2,9 @@ from flask import Flask, request, jsonify
 from apscheduler.schedulers.background import BackgroundScheduler
 import datetime
 from backend.backend_utils import get_latest_news, send_whatsapp_message
-from backend.db import get_all_users
+from backend.db import get_all_users, init_db
+
+init_db()
 
 app = Flask(__name__)
 scheduler = BackgroundScheduler()

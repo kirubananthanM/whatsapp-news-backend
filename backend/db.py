@@ -1,5 +1,25 @@
 import sqlite3
 
+DB_PATH = "whatsapp_news.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    # Create users table if it doesn't exist
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            whatsapp_number TEXT NOT NULL,
+            topics TEXT,
+            frequency INTEGER
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
 def connect():
     return sqlite3.connect("users.db")
 
