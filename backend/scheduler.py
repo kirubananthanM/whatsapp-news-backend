@@ -2,7 +2,7 @@ import time
 from datetime import datetime, timedelta
 from backend.models import get_users
 from news import get_news
-from backend.twilio_utils import send_whatsapp_message
+from backend.twilio_utils import send_whatsapp, send_whatsapp_message
 import sqlite3
 
 def update_last_sent(user_id):

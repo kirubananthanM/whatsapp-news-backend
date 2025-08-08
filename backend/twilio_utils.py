@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from twilio.rest import Client
 import os 
 
-load_dotenv()
+load_dotenv() 
 
 TWILIO_SID = os.getenv("TWILIO_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
