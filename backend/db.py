@@ -5,33 +5,23 @@ DB_PATH = "whatsapp_news.db"
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-
-    # Create users table if it doesn't exist
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            whatsapp_number TEXT NOT NULL,
-            topics TEXT,
+            name TEXT,
+            number TEXT PRIMARY KEY,
+            topic TEXT,
             frequency INTEGER
         )
     """)
-
     conn.commit()
     conn.close()
 
 def connect():
-    return sqlite3.connect("users.db")
+    return sqlite3.connect(DB_PATH)
 
 def save_user(name, number, topic, frequency):
     conn = connect()
     cur = conn.cursor()
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            name TEXT, number TEXT PRIMARY KEY,
-            topic TEXT, frequency INTEGER
-        )
-    ''')
     cur.execute('REPLACE INTO users VALUES (?, ?, ?, ?)', (name, number, topic, frequency))
     conn.commit()
     conn.close()
