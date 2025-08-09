@@ -1,19 +1,13 @@
 from flask import Flask, request, jsonify
 from apscheduler.schedulers.background import BackgroundScheduler
-from backend.backend_utils import get_latest_news, send_whatsapp_message
-from backend.db import get_all_users, init_db, save_user, get_user_topic
-import os
+from backend_utils import get_latest_news, send_whatsapp_message
+from db import init_db, save_user, get_all_users, get_user_topic
 
-# Init database
 init_db()
 
 app = Flask(__name__)
 scheduler = BackgroundScheduler()
 scheduler.start()
-
-# Variables you can change anytime
-TEST_WHATSAPP_NUMBER = os.getenv("FROM_WHATSAPP_NUMBER")  # Your test number
-TEST_MESSAGE = "join material-claws"  # The single message content
 
 @app.route('/')
 def home():
@@ -22,29 +16,40 @@ def home():
 @app.route('/register', methods=['POST'])
 def register():
     data = request.json
-    save_user(data['name'], data['number'], data['topic'], int(data['frequency']), data['email'])
-    return jsonify({"status": "saved", "message": "User data saved successfully"})
+    name = data['name']
+    number = data['number']
+    topic = data['topic']
+    frequency = int(data['frequency'])
 
-@app.route('/start', methods=['POST'])
-def start_service():
-    # 1️⃣ Send single WhatsApp message
-    send_whatsapp_message(TEST_WHATSAPP_NUMBER, TEST_MESSAGE)
+    save_user(name, number, topic, frequency)
 
-    # 2️⃣ Start periodic jobs for all users
-    schedule_existing_users()
+    # Schedule periodic job
+    job_id = f"user_{number}"
+    scheduler.add_job(
+        func=send_news_to_user,
+        trigger='interval',
+        hours=frequency,
+        id=job_id,
+        replace_existing=True,
+        args=[number]
+    )
 
-    return jsonify({"status": "started", "message": "Service started and test message sent"})
+    return jsonify({"status": "registered", "message": f"{name} will receive news every {frequency} hours."})
 
 @app.route('/stop', methods=['POST'])
-def stop_service():
-    scheduler.remove_all_jobs()
-    return jsonify({"status": "stopped", "message": "All scheduled jobs stopped"})
+def stop():
+    number = request.json.get('number')
+    job_id = f"user_{number}"
+    scheduler.remove_job(job_id)
+    return jsonify({"status": "stopped", "message": f"News sending stopped for {number}."})
 
 def send_news_to_user(number):
     topic = get_user_topic(number)
-    message = get_latest_news(topic)
-    send_whatsapp_message(number, message)
+    if topic:
+        message = get_latest_news(topic)
+        send_whatsapp_message(number, message)
 
+# On server restart, reschedule all users
 def schedule_existing_users():
     users = get_all_users()
     for user in users:
@@ -56,6 +61,8 @@ def schedule_existing_users():
             replace_existing=True,
             args=[user['number']]
         )
+
+schedule_existing_users()
 
 if __name__ == '__main__':
     app.run()
