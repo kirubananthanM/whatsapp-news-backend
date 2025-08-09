@@ -1,14 +1,19 @@
 from flask import Flask, request, jsonify
 from apscheduler.schedulers.background import BackgroundScheduler
 from backend.backend_utils import get_latest_news, send_whatsapp_message
-from backend.db import save_user, get_user_topic, get_all_users, init_db
+from backend.db import get_all_users, init_db, save_user, get_user_topic
+import os
 
-# Ensure DB exists
+# Init database
 init_db()
 
 app = Flask(__name__)
 scheduler = BackgroundScheduler()
 scheduler.start()
+
+# Variables you can change anytime
+TEST_WHATSAPP_NUMBER = os.getenv("FROM_WHATSAPP_NUMBER")  # Your test number
+TEST_MESSAGE = "join material-claws"  # The single message content
 
 @app.route('/')
 def home():
@@ -17,23 +22,23 @@ def home():
 @app.route('/register', methods=['POST'])
 def register():
     data = request.json
-    name = data['name']
-    number = data['number']
-    topic = data['topic']
-    frequency = int(data['frequency'])
+    save_user(data['name'], data['number'], data['topic'], int(data['frequency']), data['email'])
+    return jsonify({"status": "saved", "message": "User data saved successfully"})
 
-    save_user(name, number, topic, frequency)
+@app.route('/start', methods=['POST'])
+def start_service():
+    # 1️⃣ Send single WhatsApp message
+    send_whatsapp_message(TEST_WHATSAPP_NUMBER, TEST_MESSAGE)
 
-    scheduler.add_job(
-        func=send_news_to_user,
-        trigger='interval',
-        hours=frequency,
-        id=f"user_{number}",
-        replace_existing=True,
-        args=[number]
-    )
+    # 2️⃣ Start periodic jobs for all users
+    schedule_existing_users()
 
-    return jsonify({"status": "registered", "message": f"{name} will receive news every {frequency} hours."})
+    return jsonify({"status": "started", "message": "Service started and test message sent"})
+
+@app.route('/stop', methods=['POST'])
+def stop_service():
+    scheduler.remove_all_jobs()
+    return jsonify({"status": "stopped", "message": "All scheduled jobs stopped"})
 
 def send_news_to_user(number):
     topic = get_user_topic(number)
@@ -51,8 +56,6 @@ def schedule_existing_users():
             replace_existing=True,
             args=[user['number']]
         )
-
-schedule_existing_users()
 
 if __name__ == '__main__':
     app.run()
