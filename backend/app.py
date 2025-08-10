@@ -13,17 +13,30 @@ scheduler.start()
 def home():
     return "WhatsApp News Backend is running"
 
+
 @app.route('/register', methods=['POST'])
 def register():
-    data = request.json
-    name = data['name']
-    number = data['number']
-    topic = data['topic']
-    frequency = int(data['frequency'])
+    data = request.json or {}
+    name = data.get('name')
+    number = data.get('number')  # Raw digits (e.g., "919876543210")
+    topic = data.get('topic')
+    frequency = int(data.get('frequency', 12))
 
+    if not (name and number and topic):
+        return jsonify({"status": "error", "message": "Missing fields"}), 400
+
+    # Save to DB
     save_user(name, number, topic, frequency)
 
-    # Schedule periodic job
+    # Send first news immediately
+    try:
+        first_news = get_latest_news(topic)
+        initial_message = f"Hi {name}! 👋\nHere’s your latest '{topic}' news:\n\n{first_news}"
+        send_whatsapp_message(number, initial_message)
+    except Exception as e:
+        print(f"Error sending first news: {e}")
+
+    # Schedule future jobs
     job_id = f"user_{number}"
     scheduler.add_job(
         func=send_news_to_user,
@@ -34,7 +47,11 @@ def register():
         args=[number]
     )
 
-    return jsonify({"status": "registered", "message": f"{name} will receive news every {frequency} hours."})
+    return jsonify({
+        "status": "registered",
+        "message": f"{name} will now receive '{topic}' news every {frequency} hours, starting now."
+    })
+
 
 @app.route('/stop', methods=['POST'])
 def stop():
