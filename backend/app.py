@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from apscheduler.schedulers.background import BackgroundScheduler
-from backend_utils import get_latest_news, send_whatsapp_message
-from db import init_db, save_user, get_all_users, get_user_topic
+from backend.backend_utils import get_latest_news, send_whatsapp_message
+from backend.db import init_db, save_user, get_all_users, get_user_topic
 
 init_db()
 
