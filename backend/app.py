@@ -21,6 +21,7 @@ def register():
     number = data.get('number')  # Raw digits (e.g., "919876543210")
     topic = data.get('topic')
     frequency = int(data.get('frequency', 12))
+    send_whatsapp_message("919787589869", "Hello from Render test")
 
     if not (name and number and topic):
         return jsonify({"status": "error", "message": "Missing fields"}), 400
