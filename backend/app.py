@@ -19,32 +19,20 @@ def register():
     try:
         data = request.json or {}
         name = data.get('name')
-        number = data.get('number')  # e.g., 919876543210
+        number = data.get('number')
         topic = data.get('topic')
         frequency = int(data.get('frequency', 12))
 
-        # Basic validation
         if not (name and number and topic):
             return jsonify({"status": "error", "message": "Missing name, number, or topic"}), 400
 
-        # Save the user in DB
         save_user(name, number, topic, frequency)
 
-        # Get first news & send immediately
         first_news = get_latest_news(topic)
         initial_message = f"Hi {name}! 👋\nHere’s your latest '{topic}' news:\n\n{first_news}"
 
-        try:
-            send_whatsapp_message(number, initial_message)
-            print(f"First news sent successfully to {number}")
-        except TwilioRestException as e:  # pyright: ignore[reportUndefinedVariable]
-            print(f"Twilio error {e.status}: {e.msg} ({e.code})")
-            return jsonify({"status": "error", "message": f"Twilio error: {e.msg}"}), 500
-        except Exception as e:
-            print(f"Unexpected error while sending first news: {e}")
-            return jsonify({"status": "error", "message": "Failed to send first news"}), 500
+        send_whatsapp_message(number, initial_message)
 
-        # Schedule periodic news
         job_id = f"user_{number}"
         scheduler.add_job(
             func=send_news_to_user,
@@ -60,10 +48,12 @@ def register():
             "message": f"{name} will now receive '{topic}' news every {frequency} hours."
         })
 
+    except TwilioRestException as e:
+        return jsonify({"status": "error", "message": f"Twilio error: {e.msg}"}), 500
     except Exception as e:
-        print(f"Error in /register: {e}")
-        return jsonify({"status": "error", "message": "Internal server error"}), 500
-
+        return jsonify({"status": "error", "message": str(e)}), 500
+    
+    
 @app.route('/stop', methods=['POST'])
 def stop():
     number = request.json.get('number')
