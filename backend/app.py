@@ -16,43 +16,53 @@ def home():
 
 @app.route('/register', methods=['POST'])
 def register():
-    data = request.json or {}
-    name = data.get('name')
-    number = data.get('number')  # Raw digits (e.g., "919876543210")
-    topic = data.get('topic')
-    frequency = int(data.get('frequency', 12))
-    send_whatsapp_message("919787589869", "Hello from Render test")
-
-    if not (name and number and topic):
-        return jsonify({"status": "error", "message": "Missing fields"}), 400
-
-    # Save to DB
-    save_user(name, number, topic, frequency)
-
-    # Send first news immediately
     try:
+        data = request.json or {}
+        name = data.get('name')
+        number = data.get('number')  # e.g., 919876543210
+        topic = data.get('topic')
+        frequency = int(data.get('frequency', 12))
+
+        # Basic validation
+        if not (name and number and topic):
+            return jsonify({"status": "error", "message": "Missing name, number, or topic"}), 400
+
+        # Save the user in DB
+        save_user(name, number, topic, frequency)
+
+        # Get first news & send immediately
         first_news = get_latest_news(topic)
         initial_message = f"Hi {name}! 👋\nHere’s your latest '{topic}' news:\n\n{first_news}"
-        send_whatsapp_message(number, initial_message)
+
+        try:
+            send_whatsapp_message(number, initial_message)
+            print(f"First news sent successfully to {number}")
+        except TwilioRestException as e:
+            print(f"Twilio error {e.status}: {e.msg} ({e.code})")
+            return jsonify({"status": "error", "message": f"Twilio error: {e.msg}"}), 500
+        except Exception as e:
+            print(f"Unexpected error while sending first news: {e}")
+            return jsonify({"status": "error", "message": "Failed to send first news"}), 500
+
+        # Schedule periodic news
+        job_id = f"user_{number}"
+        scheduler.add_job(
+            func=send_news_to_user,
+            trigger='interval',
+            hours=frequency,
+            id=job_id,
+            replace_existing=True,
+            args=[number]
+        )
+
+        return jsonify({
+            "status": "registered",
+            "message": f"{name} will now receive '{topic}' news every {frequency} hours."
+        })
+
     except Exception as e:
-        print(f"Error sending first news: {e}")
-
-    # Schedule future jobs
-    job_id = f"user_{number}"
-    scheduler.add_job(
-        func=send_news_to_user,
-        trigger='interval',
-        hours=frequency,
-        id=job_id,
-        replace_existing=True,
-        args=[number]
-    )
-
-    return jsonify({
-        "status": "registered",
-        "message": f"{name} will now receive '{topic}' news every {frequency} hours, starting now."
-    })
-
+        print(f"Error in /register: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
 
 @app.route('/stop', methods=['POST'])
 def stop():
