@@ -37,7 +37,7 @@ def register():
         try:
             send_whatsapp_message(number, initial_message)
             print(f"First news sent successfully to {number}")
-        except TwilioRestException as e:
+        except TwilioRestException as e:  # pyright: ignore[reportUndefinedVariable]
             print(f"Twilio error {e.status}: {e.msg} ({e.code})")
             return jsonify({"status": "error", "message": f"Twilio error: {e.msg}"}), 500
         except Exception as e:
