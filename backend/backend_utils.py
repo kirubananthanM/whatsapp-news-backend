@@ -11,15 +11,24 @@ TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 FROM_WHATSAPP_NUMBER = os.getenv("FROM_WHATSAPP_NUMBER")
 client = Client(TWILIO_SID, TWILIO_AUTH_TOKEN)
 
-def get_latest_news(topic):
+def get_latest_news(topic, count=3):
+    """Fetch multiple latest news articles."""
     NEWS_API_KEY = os.getenv("NEWS_API_KEY")
     url = f"https://newsdata.io/api/1/news?apikey={NEWS_API_KEY}&q={topic}&language=en"
     response = requests.get(url)
     data = response.json()
-    if data.get("results"):
-        article = data["results"][0]
-        return f"📰 {article['title']}\n🔗 {article['link']}"
-    return "No news found."
+    
+    if not data.get("results"):
+        return "No news found."
+
+    # Take top 'count' results
+    articles = data["results"][:count]
+    news_list = []
+    for article in articles:
+        news_item = f"📰 {article['title']}\n🔗 {article['link']}"
+        news_list.append(news_item)
+    
+    return "\n\n".join(news_list)
 
 def format_number(number):
     """Ensure number is digits only for Twilio."""

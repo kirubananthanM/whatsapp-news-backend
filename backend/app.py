@@ -14,6 +14,7 @@ def home():
     return "WhatsApp News Backend is running"
 
 
+
 @app.route('/register', methods=['POST'])
 def register():
     try:
@@ -21,14 +22,14 @@ def register():
         name = data.get('name')
         number = data.get('number')
         topic = data.get('topic')
-        frequency = int(data.get('frequency', 12))
+        frequency = int(data.get('frequency', 2))  # default 2 minutes
 
         if not (name and number and topic):
             return jsonify({"status": "error", "message": "Missing name, number, or topic"}), 400
 
         save_user(name, number, topic, frequency)
 
-        first_news = get_latest_news(topic)
+        first_news = get_latest_news(topic, count=3)
         initial_message = f"Hi {name}! 👋\nHere’s your latest '{topic}' news:\n\n{first_news}"
 
         send_whatsapp_message(number, initial_message)
@@ -37,7 +38,7 @@ def register():
         scheduler.add_job(
             func=send_news_to_user,
             trigger='interval',
-            hours=frequency,
+            minutes=frequency,  # CHANGED from hours to minutes
             id=job_id,
             replace_existing=True,
             args=[number]
@@ -45,7 +46,7 @@ def register():
 
         return jsonify({
             "status": "registered",
-            "message": f"{name} will now receive '{topic}' news every {frequency} hours."
+            "message": f"{name} will now receive '{topic}' news every {frequency} minutes."
         })
 
     except TwilioRestException as e:
