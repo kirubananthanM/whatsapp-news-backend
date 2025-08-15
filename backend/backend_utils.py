@@ -19,9 +19,20 @@ def get_latest_news(topic):
         return f"📰 {article['title']}\n🔗 {article['link']}"
     return "No news found."
 
+from twilio.base.exceptions import TwilioRestException
+
 def send_whatsapp_message(to_number, message):
-    client.messages.create(
-        from_=FROM_WHATSAPP_NUMBER,
-        to=f"whatsapp:{to_number}",
-        body=message
-    )
+    try:
+        client.messages.create(
+            from_=FROM_WHATSAPP_NUMBER,
+            to=f"whatsapp:{to_number}",
+            body=message
+        )
+        print(f"Message sent to {to_number}")
+    except TwilioRestException as e:
+        print(f"Twilio error {e.status}: {e.msg} ({e.code})")
+        raise
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        raise
+
