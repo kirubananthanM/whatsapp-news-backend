@@ -1,45 +1,52 @@
-import sqlite3
+import os, sqlite3, time
+from pathlib import Path
 
-DB_PATH = "users.db"
+DB_PATH = os.getenv("DB_PATH", "db.sqlite3")
+Path(os.path.dirname(DB_PATH) or ".").mkdir(parents=True, exist_ok=True)
 
-def connect():
-    return sqlite3.connect(DB_PATH)
+def _conn():
+    # check_same_thread=False lets Flask and cron both use sqlite
+    return sqlite3.connect(DB_PATH, check_same_thread=False)
 
 def init_db():
-    conn = connect()
-    cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            name TEXT,
-            number TEXT PRIMARY KEY,
-            topic TEXT,
-            frequency INTEGER
+    with _conn() as con:
+        con.execute("""
+        CREATE TABLE IF NOT EXISTS users(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            number TEXT NOT NULL UNIQUE,
+            topic TEXT NOT NULL,
+            frequency_minutes INTEGER NOT NULL,
+            last_sent_at INTEGER
         )
-    """)
-    conn.commit()
-    conn.close()
-def connect():
-    return sqlite3.connect(DB_PATH)
+        """)
+        con.commit()
 
-def save_user(name, number, topic, frequency):
-    conn = connect()
-    cur = conn.cursor()
-    cur.execute('REPLACE INTO users VALUES (?, ?, ?, ?)', (name, number, topic, frequency))
-    conn.commit()
-    conn.close()
+def save_user(name, number, topic, frequency_minutes):
+    with _conn() as con:
+        con.execute("""
+            INSERT INTO users(name, number, topic, frequency_minutes, last_sent_at)
+            VALUES (?, ?, ?, ?, NULL)
+            ON CONFLICT(number) DO UPDATE SET
+                name=excluded.name,
+                topic=excluded.topic,
+                frequency_minutes=excluded.frequency_minutes
+        """, (name, number, topic, frequency_minutes))
+        con.commit()
 
-def get_user_topic(number):
-    conn = connect()
-    cur = conn.cursor()
-    cur.execute("SELECT topic FROM users WHERE number = ?", (number,))
-    result = cur.fetchone()
-    conn.close()
-    return result[0] if result else None
+def update_last_sent(number, when_ts=None):
+    when_ts = when_ts or int(time.time())
+    with _conn() as con:
+        con.execute("UPDATE users SET last_sent_at=? WHERE number=?", (when_ts, number))
+        con.commit()
 
-def get_all_users():
-    conn = connect()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM users")
-    rows = cur.fetchall()
-    conn.close()
-    return [{"name": r[0], "number": r[1], "topic": r[2], "frequency": r[3]} for r in rows]
+def all_users():
+    with _conn() as con:
+        cur = con.execute("SELECT name, number, topic, frequency_minutes, last_sent_at FROM users")
+        rows = cur.fetchall()
+    # return list of dicts
+    return [
+        dict(name=r[0], number=r[1], topic=r[2],
+             frequency_minutes=r[3], last_sent_at=r[4])
+        for r in rows
+    ]

@@ -1,7 +1,7 @@
 Flask
 requests
 twilio
-APScheduler
+flask-cors
 python-dotenv
 gunicorn
 requests
