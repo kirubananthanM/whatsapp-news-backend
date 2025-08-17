@@ -1,9 +1,10 @@
+import sqlite3
 import time
 from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask_cors import CORS # type: ignore
 from twilio.base.exceptions import TwilioRestException
 
-from backend.db import init_db, save_user, update_last_sent
+from backend.db import DB_PATH, init_db, save_user, update_last_sent
 from backend.backend_utils import get_latest_news, send_whatsapp_message
 
 app = Flask(__name__)
@@ -19,41 +20,39 @@ def root():
 @app.route("/register", methods=["POST"])
 def register():
     try:
-        data = request.json or {}
+        data = request.get_json(force=True)
         print("📩 /register hit:", data)
 
-        name = (data.get("name") or "").strip()
-        number = (data.get("number") or "").strip()      # e.g. 919xxxxxxx
-        topic = (data.get("topic") or "").strip()
-        # treat frequency as MINUTES from the app
-        frequency_minutes = int(data.get("frequency", 2))
+        name = data.get("name")
+        number = data.get("number")
+        topic = data.get("topic")
+        frequency = int(data.get("frequency", 1))
 
-        if not (name and number and topic and frequency_minutes > 0):
-            return jsonify({"status": "error",
-                            "message": "Missing name/number/topic or invalid frequency"}), 400
+        # Save to DB
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute(
+            "INSERT INTO users (name, number, topic, frequency, last_sent_at) VALUES (?, ?, ?, ?, ?)",
+            (name, number, topic, frequency, int(time.time())),
+        )
+        conn.commit()
+        conn.close()
 
-        # Save or update user
-        save_user(name, number, topic, frequency_minutes)
-
-        # Compose first (3 links) message & send immediately
-        news = get_latest_news(topic, count=3)
-        msg = f"Hi {name}! 👋\nHere are the latest '{topic}' updates:\n\n{news}"
+        # Send first WhatsApp message (test)
         try:
-            send_whatsapp_message(number, msg)
-            update_last_sent(number, int(time.time()))  # so cron won’t send again immediately
-        except TwilioRestException as e:
-            return jsonify({"status": "error", "message": f"Twilio error: {e.msg}"}), 500
-        except Exception as e:
-            return jsonify({"status": "error", "message": f"Send error: {e}"}), 500
+            send_whatsapp_message(number, "✅ You are registered! First news will come soon.")
+            print(f"✅ First message sent to {number}")
+        except Exception as twilio_error:
+            print("❌ Twilio send error:", str(twilio_error))
+            return jsonify({"error": "Twilio send failed", "details": str(twilio_error)}), 500
 
-        return jsonify({
-            "status": "registered",
-            "message": f"You will receive '{topic}' news every {frequency_minutes} minute(s)."
-        }), 200
+        return jsonify({"status": "ok", "msg": f"User {name} registered"}), 200
 
     except Exception as e:
-        print("❌ Error in /register:", e)
-        return jsonify({"status": "error", "message": "Internal server error"}), 500
+        print("❌ Error in /register:", str(e))
+        return jsonify({"error": "Register failed", "details": str(e)}), 500
+
+
 
 # (optional) simple healthcheck for Render
 @app.route("/health", methods=["GET"])
