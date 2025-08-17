@@ -9,18 +9,29 @@ def _conn():
     return sqlite3.connect(DB_PATH, check_same_thread=False)
 
 def init_db():
-    with _conn() as con:
-        con.execute("""
-        CREATE TABLE IF NOT EXISTS users(
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    # Ensure table exists with correct schema
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            number TEXT NOT NULL UNIQUE,
-            topic TEXT NOT NULL,
-            frequency_minutes INTEGER NOT NULL,
+            name TEXT,
+            number TEXT,
+            topic TEXT,
+            frequency INTEGER,
             last_sent_at INTEGER
         )
-        """)
-        con.commit()
+    """)
+    # Ensure frequency column exists (for old DBs)
+    c.execute("PRAGMA table_info(users)")
+    columns = [col[1] for col in c.fetchall()]
+    if "frequency" not in columns:
+        c.execute("ALTER TABLE users ADD COLUMN frequency INTEGER DEFAULT 1")
+        print("🔄 Added missing 'frequency' column")
+    conn.commit()
+    conn.close()
+    print("✅ Database initialized with correct schema")
+
 
 def save_user(name, number, topic, frequency_minutes):
     with _conn() as con:
