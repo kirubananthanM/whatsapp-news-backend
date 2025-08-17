@@ -6,6 +6,7 @@ from twilio.base.exceptions import TwilioRestException
 
 from backend.db import DB_PATH, init_db, save_user, update_last_sent
 from backend.backend_utils import get_latest_news, send_whatsapp_message
+from backend.news import get_news
 
 app = Flask(__name__)
 CORS(app)
@@ -71,3 +72,48 @@ def health():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
+
+DB_PATH = "/opt/render/project/src/db.sqlite3"  # or your DB path
+
+@app.route("/tick", methods=["GET"])
+def tick():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT id, name, number, topic, frequency, last_sent_at FROM users")
+        users = c.fetchall()
+        conn.close()
+
+        now = int(time.time())
+
+        for user in users:
+            user_id, name, number, topic, frequency, last_sent_at = user
+
+            if last_sent_at is None:
+                last_sent_at = 0
+
+            # frequency is in minutes, so convert to seconds
+            if now - last_sent_at >= frequency * 60:
+                try:
+                    news = get_news(topic)
+                    if news:
+                        message = "📰 Here are your latest news:\n\n" + "\n".join(news[:3])
+                        send_whatsapp_message(number, message)
+
+                        # update last_sent_at
+                        conn = sqlite3.connect(DB_PATH)
+                        c = conn.cursor()
+                        c.execute("UPDATE users SET last_sent_at=? WHERE id=?", (now, user_id))
+                        conn.commit()
+                        conn.close()
+
+                        print(f"✅ Sent news to {number}")
+                except Exception as e:
+                    print(f"❌ Failed to send news to {number}: {e}")
+
+        return jsonify({"status": "ok", "msg": "tick processed"}), 200
+
+    except Exception as e:
+        print("❌ Error in /tick:", e)
+        return jsonify({"status": "error", "msg": str(e)}), 500
+
