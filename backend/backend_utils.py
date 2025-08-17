@@ -5,7 +5,10 @@ from twilio.base.exceptions import TwilioRestException
 # ---- Twilio client from env ----
 ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 AUTH_TOKEN  = os.getenv("TWILIO_AUTH_TOKEN")
-FROM_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_FROM")  # e.g. whatsapp:+14155238886
+FROM_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_FROM")
+
+print("🚀 Initializing Twilio client with SID:", ACCOUNT_SID)
+
 client = Client(ACCOUNT_SID, AUTH_TOKEN)
 
 # ---- News fetcher: returns 3 items merged into one text ----

@@ -17,6 +17,16 @@ init_db()
 def root():
     return "OK", 200
 
+@app.route("/twilio-check")
+def twilio_check():
+    try:
+        client.api.accounts(TWILIO_ACCOUNT_SID).fetch()
+        return {"status": "ok", "msg": "✅ Twilio credentials valid"}, 200
+    except Exception as e:
+        return {"status": "error", "msg": str(e)}, 500
+
+
+
 @app.route("/register", methods=["POST"])
 def register():
     try:

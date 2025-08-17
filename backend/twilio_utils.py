@@ -5,9 +5,9 @@ import os
 
 load_dotenv()
 
-TWILIO_SID = os.getenv("TWILIO_SID")
+TWILIO_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-FROM_NUMBER = os.getenv("FROM_WHATSAPP_NUMBER")
+FROM_NUMBER = os.getenv("TWILIO_WHATSAPP_FROM")
 
 client = Client(TWILIO_SID, TWILIO_AUTH_TOKEN)
 
