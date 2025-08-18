@@ -1,4 +1,5 @@
 import sqlite3
+import os
 import time
 from flask import Flask, request, jsonify
 from flask_cors import CORS # type: ignore
@@ -6,10 +7,13 @@ from twilio.base.exceptions import TwilioRestException
 
 from backend.db import DB_PATH, init_db, save_user, update_last_sent
 from backend.backend_utils import get_latest_news, send_whatsapp_message
+from backend.models import get_users
 from backend.news import get_news
 
 app = Flask(__name__)
 CORS(app)
+
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 
 print("🚀 Flask app started, waiting for requests...")
 init_db()
@@ -28,7 +32,6 @@ def twilio_check():
 
 
 
-@app.route("/register", methods=["POST"])
 @app.route("/register", methods=["POST"])
 def register():
     try:
@@ -66,7 +69,7 @@ DB_PATH = "/opt/render/project/src/db.sqlite3"  # or your DB path
 def tick():
     try:
         now = int(time.time())
-        users = get_all_users()
+        users = get_users()
         print(f"⏰ Tick called at {now}, checking {len(users)} users")
 
         for user in users:
