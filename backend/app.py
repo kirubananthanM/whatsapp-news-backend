@@ -1,11 +1,13 @@
 # app.py
+import sqlite3
 import os, time
 from flask import Flask, request, jsonify
 from flask_cors import CORS  # type: ignore
 from twilio.rest import Client
 from twilio.base.exceptions import TwilioRestException
+from backend.news import get_news   # make sure you import at top
 
-from backend.db import init_db, save_user, update_last_sent, all_users
+from backend.db import DB_PATH, init_db, save_user, update_last_sent, all_users
 from backend.backend_utils import send_whatsapp_message
 
 app = Flask(__name__)
@@ -64,6 +66,9 @@ def health():
 
 
 @app.route("/tick", methods=["GET"])
+
+
+@app.route("/tick", methods=["GET"])
 def tick():
     try:
         now = int(time.time())
@@ -76,13 +81,24 @@ def tick():
             number = user["number"]
             topic = user["topic"]
 
-            print(f"👉 Checking {number}, freq={freq_minutes}, last_sent={last_sent}")
-
-            if (now - last_sent) >= freq_minutes * 60:   # minutes not hours
+            if (now - last_sent) >= freq_minutes * 60:
                 try:
-                    send_whatsapp_message(number, f"📰 News update about {topic}")
+                    # ✅ fetch news
+                    articles = get_news(topic)
+
+                    if not articles:
+                        send_whatsapp_message(number, f"⚠️ No news found for {topic} right now.")
+                    else:
+                        # send top 3 articles
+                        news_msg = f"📰 Latest {topic} news:\n\n"
+                        for i, a in enumerate(articles[:3], start=1):
+                            news_msg += f"{i}. {a['title']}\n{a['url']}\n\n"
+
+                        send_whatsapp_message(number, news_msg)
+
                     update_last_sent(number, now)
                     print(f"✅ Sent news to {number}")
+
                 except Exception as twilio_err:
                     print(f"❌ Twilio send failed for {number}: {twilio_err}")
 
@@ -90,6 +106,28 @@ def tick():
 
     except Exception as e:
         print("❌ Error in /tick:", e)
+        return jsonify({"status": "error", "msg": str(e)}), 500
+
+
+@app.route("/stop", methods=["POST"])
+def stop():
+    try:
+        data = request.json
+        number = data.get("number")
+        print(f"🛑 Stop requested for {number}")
+
+        # In simplest version → just remove the user from DB
+        with sqlite3.connect(DB_PATH) as con:
+            con.execute("DELETE FROM users WHERE number=?", (number,))
+            con.commit()
+
+        # Optional: send confirmation message
+        send_whatsapp_message(number, "🛑 You have been unsubscribed from news updates.")
+
+        return jsonify({"status": "ok", "msg": "Stopped"}), 200
+
+    except Exception as e:
+        print("❌ Error in /stop:", e)
         return jsonify({"status": "error", "msg": str(e)}), 500
 
 
