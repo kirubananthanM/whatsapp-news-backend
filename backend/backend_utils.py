@@ -1,52 +1,89 @@
-import os, requests
+# backend/backend_utils.py
+import os
+import requests
 from twilio.rest import Client
 from twilio.base.exceptions import TwilioRestException
 
-# ---- Twilio client from env ----
-ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
-AUTH_TOKEN  = os.getenv("TWILIO_AUTH_TOKEN")
-FROM_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_FROM")
+# Twilio setup
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+FROM_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
 
-print("🚀 Initializing Twilio client with SID:", ACCOUNT_SID)
+# News API setup
+NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
+NEWS_API_URL = "https://newsapi.org/v2/top-headlines"
 
-client = Client(ACCOUNT_SID, AUTH_TOKEN)
+# Initialize Twilio client
+client = None
+if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
+    client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+else:
+    print("⚠️ Warning: Twilio credentials not set. WhatsApp sending will fail.")
 
-# ---- News fetcher: returns 3 items merged into one text ----
-def get_latest_news(topic, count=3):
-    api_key = os.getenv("NEWS_API_KEY")
-    url = f"https://newsdata.io/api/1/news?apikey={api_key}&q={topic}&language=en"
-    try:
-        r = requests.get(url, timeout=12)
-        r.raise_for_status()
-        data = r.json()
-    except Exception as e:
-        return f"No news found (API error: {e})"
 
-    results = (data or {}).get("results") or []
-    if not results:
-        return "No news found."
-
-    items = []
-    for art in results[:count]:
-        title = art.get("title") or "Untitled"
-        link = art.get("link") or ""
-        items.append(f"📰 {title}\n🔗 {link}")
-
-    return "\n\n".join(items)
-
-# ---- Number utility ----
-def digits_only(number):
-    return "".join(ch for ch in str(number) if ch.isdigit())
-
-# ---- WhatsApp sender with clear error logs ----
+# --------------------------
+# ✅ Twilio WhatsApp Sending
+# --------------------------
 def send_whatsapp_message(to_number, message):
-    to = f"whatsapp:{digits_only(to_number)}"
+    """Send a WhatsApp message using Twilio API."""
+    if not client:
+        print("❌ Twilio client not initialized (check env vars)")
+        return False
+
     try:
-        client.messages.create(from_=FROM_WHATSAPP_NUMBER, to=to, body=message)
-        print(f"✅ Message sent to {to}")
+        msg = client.messages.create(
+            from_=FROM_WHATSAPP_NUMBER,
+            to=f"whatsapp:{to_number}",
+            body=message
+        )
+        print(f"✅ WhatsApp message sent to {to_number}: SID={msg.sid}")
+        return True
     except TwilioRestException as e:
-        print(f"❌ Twilio error {e.status}: {e.msg} ({e.code})")
-        raise
+        print(f"❌ Twilio error {e.code}: {e.msg}")
+        return False
     except Exception as e:
-        print(f"❌ Unexpected send error: {e}")
-        raise
+        print(f"❌ Unknown error sending WhatsApp to {to_number}: {e}")
+        return False
+
+
+# --------------------------
+# ✅ News Fetching
+# --------------------------
+def get_latest_news(topic="general", count=3):
+    """
+    Fetch latest news headlines for a topic.
+    Defaults to 3 headlines.
+    """
+    if not NEWS_API_KEY:
+        print("⚠️ NEWS_API_KEY not set. Returning dummy headlines.")
+        return [f"[Dummy] News about {topic}"]
+
+    try:
+        params = {
+            "apiKey": NEWS_API_KEY,
+            "q": topic,
+            "language": "en",
+            "pageSize": count,
+        }
+        response = requests.get(NEWS_API_URL, params=params, timeout=10)
+        data = response.json()
+
+        if response.status_code != 200 or "articles" not in data:
+            print(f"❌ Error fetching news: {data}")
+            return [f"No news available for {topic}"]
+
+        headlines = []
+        for art in data["articles"][:count]:
+            title = art.get("title")
+            url = art.get("url")
+            if title and url:
+                headlines.append(f"{title}\n{url}")
+            elif title:
+                headlines.append(title)
+
+        print(f"✅ Fetched {len(headlines)} news for topic '{topic}'")
+        return headlines if headlines else [f"No news available for {topic}"]
+
+    except Exception as e:
+        print(f"❌ News API error: {e}")
+        return [f"Error fetching news for {topic}"]

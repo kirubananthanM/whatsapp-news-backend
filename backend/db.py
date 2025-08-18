@@ -1,3 +1,4 @@
+# db.py
 import os, sqlite3, time
 from pathlib import Path
 
@@ -16,7 +17,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
-            number TEXT,
+            number TEXT UNIQUE,
             topic TEXT,
             frequency INTEGER,
             last_sent_at INTEGER
@@ -32,32 +33,33 @@ def init_db():
     conn.close()
     print("✅ Database initialized with correct schema")
 
-
-def save_user(name, number, topic, frequency_minutes):
+def save_user(name, number, topic, frequency):
+    """Insert or update a user (number is UNIQUE key)."""
     with _conn() as con:
         con.execute("""
-            INSERT INTO users(name, number, topic, frequency_minutes, last_sent_at)
+            INSERT INTO users(name, number, topic, frequency, last_sent_at)
             VALUES (?, ?, ?, ?, NULL)
             ON CONFLICT(number) DO UPDATE SET
                 name=excluded.name,
                 topic=excluded.topic,
-                frequency_minutes=excluded.frequency_minutes
-        """, (name, number, topic, frequency_minutes))
+                frequency=excluded.frequency
+        """, (name, number, topic, frequency))
         con.commit()
 
 def update_last_sent(number, when_ts=None):
+    """Update last_sent_at for a user."""
     when_ts = when_ts or int(time.time())
     with _conn() as con:
         con.execute("UPDATE users SET last_sent_at=? WHERE number=?", (when_ts, number))
         con.commit()
 
 def all_users():
+    """Return all users as a list of dicts."""
     with _conn() as con:
-        cur = con.execute("SELECT name, number, topic, frequency_minutes, last_sent_at FROM users")
+        cur = con.execute("SELECT name, number, topic, frequency, last_sent_at FROM users")
         rows = cur.fetchall()
-    # return list of dicts
     return [
         dict(name=r[0], number=r[1], topic=r[2],
-             frequency_minutes=r[3], last_sent_at=r[4])
+             frequency=r[3], last_sent_at=r[4])
         for r in rows
     ]

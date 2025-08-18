@@ -1,26 +1,29 @@
-import sqlite3
-import os
-import time
+# app.py
+import os, time
 from flask import Flask, request, jsonify
-from flask_cors import CORS # type: ignore
+from flask_cors import CORS  # type: ignore
+from twilio.rest import Client
 from twilio.base.exceptions import TwilioRestException
 
-from backend.db import DB_PATH, init_db, save_user, update_last_sent
-from backend.backend_utils import get_latest_news, send_whatsapp_message
-from backend.models import get_users
-from backend.news import get_news
+from backend.db import init_db, save_user, update_last_sent, all_users
+from backend.backend_utils import send_whatsapp_message
 
 app = Flask(__name__)
 CORS(app)
 
+# Twilio client setup
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
 print("🚀 Flask app started, waiting for requests...")
 init_db()
 
+
 @app.route("/", methods=["GET"])
 def root():
     return "OK", 200
+
 
 @app.route("/twilio-check")
 def twilio_check():
@@ -29,7 +32,6 @@ def twilio_check():
         return {"status": "ok", "msg": "✅ Twilio credentials valid"}, 200
     except Exception as e:
         return {"status": "error", "msg": str(e)}, 500
-
 
 
 @app.route("/register", methods=["POST"])
@@ -46,7 +48,7 @@ def register():
         # save user in DB
         save_user(name, number, topic, frequency)
 
-        # ✅ Only send one welcome message (avoid duplicates)
+        # send one welcome message
         send_whatsapp_message(number, "✅ You are registered! First news will come soon.")
 
         return jsonify({"status": "ok", "msg": "Registered"}), 200
@@ -56,20 +58,16 @@ def register():
         return jsonify({"status": "error", "msg": str(e)}), 500
 
 
-# (optional) simple healthcheck for Render
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"ok": True}), 200
 
 
-DB_PATH = "/opt/render/project/src/db.sqlite3"  # or your DB path
-
 @app.route("/tick", methods=["GET"])
-
 def tick():
     try:
         now = int(time.time())
-        users = get_users()
+        users = all_users()
         print(f"⏰ Tick called at {now}, checking {len(users)} users")
 
         for user in users:
@@ -80,7 +78,7 @@ def tick():
 
             print(f"👉 Checking {number}, freq={freq_minutes}, last_sent={last_sent}")
 
-            if (now - last_sent) >= freq_minutes * 60:   # ✅ minutes not hours
+            if (now - last_sent) >= freq_minutes * 60:   # minutes not hours
                 try:
                     send_whatsapp_message(number, f"📰 News update about {topic}")
                     update_last_sent(number, now)
@@ -93,8 +91,8 @@ def tick():
     except Exception as e:
         print("❌ Error in /tick:", e)
         return jsonify({"status": "error", "msg": str(e)}), 500
-    
-    
+
+
 if __name__ == "__main__":
     print("🚀 Flask app started, waiting for requests...")
     app.run(host="0.0.0.0", port=10000)
