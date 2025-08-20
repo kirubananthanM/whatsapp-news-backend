@@ -83,16 +83,22 @@ def tick():
 
             if (now - last_sent) >= freq_minutes * 60:
                 try:
-                    # ✅ fetch news
                     articles = get_news(topic)
 
                     if not articles:
                         send_whatsapp_message(number, f"⚠️ No news found for {topic} right now.")
                     else:
-                        # send top 3 articles
                         news_msg = f"📰 Latest {topic} news:\n\n"
+
                         for i, a in enumerate(articles[:3], start=1):
-                            news_msg += f"{i}. {a['title']}\n{a['url']}\n\n"
+                            if isinstance(a, dict):
+                                title = a.get("title", "No title")
+                                url = a.get("url", "")
+                            else:
+                                title = str(a)
+                                url = ""
+
+                            news_msg += f"{i}. {title}\n{url}\n\n"
 
                         send_whatsapp_message(number, news_msg)
 
@@ -107,6 +113,9 @@ def tick():
     except Exception as e:
         print("❌ Error in /tick:", e)
         return jsonify({"status": "error", "msg": str(e)}), 500
+
+
+
 
 
 @app.route("/stop", methods=["POST"])
