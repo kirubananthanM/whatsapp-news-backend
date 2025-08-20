@@ -5,14 +5,44 @@ import os
 load_dotenv()
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 
-def get_news(topic):
-    url = f"https://newsdata.io/api/1/news?apikey={NEWS_API_KEY}&q={topic}&language=en"
-    res = requests.get(url).json()
-    if res.get("status") == "success" and res.get("results"):
-        news = []
-        for article in res["results"][:3]:
-            title = article.get("title")
-            link = article.get("link")
-            news.append(f"{title}\n🔗 {link}")
-        return "\n\n".join(news)
-    return "No news available for now."
+# path: backend/news.py
+import os
+import requests
+
+NEWS_API_KEY = os.getenv("NEWS_API_KEY")
+
+def get_news(topic="technology"):
+    """
+    Fetch latest news articles from NewsAPI.
+    Returns a list of dicts with 'title' and 'url'.
+    """
+    try:
+        url = (
+            f"https://newsapi.org/v2/everything?"
+            f"q={topic}&"
+            f"language=en&"
+            f"sortBy=publishedAt&"
+            f"pageSize=5&"
+            f"apiKey={NEWS_API_KEY}"
+        )
+
+        resp = requests.get(url, timeout=10)
+        data = resp.json()
+
+        # If API error
+        if resp.status_code != 200 or "articles" not in data:
+            print("❌ News API error:", data)
+            return []
+
+        articles = []
+        for art in data["articles"]:
+            articles.append({
+                "title": art.get("title", "No title"),
+                "url": art.get("url", "")
+            })
+
+        return articles
+
+    except Exception as e:
+        print("❌ get_news error:", e)
+        return []
