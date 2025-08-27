@@ -34,7 +34,7 @@ def get_news(topic):
             return []
 
         articles = []
-        for art in data.get("articles", []):
+        for art in data.get("articles", [])[:3]:
             title = art.get("title", "No title")
             url = art.get("url", "")
             articles.append({"title": title, "url": url})
