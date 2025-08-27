@@ -1,19 +1,18 @@
-from dotenv import load_dotenv
-import requests
 import os
+import requests
 
-load_dotenv()
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
-
-# path: backend/news.py
-
 
 def get_news(topic):
     """
-    Fetch latest news articles from NewsAPI.org.
-    Returns a single formatted string with up to 3 articles.
+    Fetch latest news articles from NewsAPI.
+    Returns a list of dicts with 'title' and 'url'.
     """
     try:
+        if not NEWS_API_KEY:
+            print("❌ NEWS_API_KEY not set in environment")
+            return []
+
         url = (
             f"https://newsapi.org/v2/everything?"
             f"q={topic}&"
@@ -26,22 +25,22 @@ def get_news(topic):
         resp = requests.get(url, timeout=10)
         data = resp.json()
 
-        # If API error
-        if resp.status_code != 200 or "articles" not in data:
+        if resp.status_code != 200:
+            print("❌ News API HTTP error:", resp.status_code, data)
+            return []
+
+        if data.get("status") != "ok":
             print("❌ News API error:", data)
-            return f"⚠️ No news found. Error: {data.get('message', 'Unknown error')}"
+            return []
 
-        messages = []
-        for art in data["articles"]:
-            title = art.get("title", "No Title")
-            source = art.get("source", {}).get("name", "Unknown")
-            pub_date = art.get("publishedAt", "Unknown Date")
-            link = art.get("url", "#")
+        articles = []
+        for art in data.get("articles", []):
+            title = art.get("title", "No title")
+            url = art.get("url", "")
+            articles.append({"title": title, "url": url})
 
-            messages.append(f"🗞️ *{title}*\n📍{source} | 🕒 {pub_date}\n🔗 {link}")
-
-        return "\n\n".join(messages)
+        return articles
 
     except Exception as e:
         print("❌ get_news error:", e)
-        return "⚠️ Error fetching news"
+        return []
